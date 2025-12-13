@@ -1,6 +1,7 @@
 import express, { Request, Response } from 'express'
 import initDB from './config/db'
 import { vehicleRoute } from './modules/vehicles/vehicles.route';
+import { authRoute } from './modules/auth/auth.route';
 
 const app = express()
 
@@ -14,11 +15,14 @@ app.get('/', (req: Request, res: Response) => {
 })
 
 // Vehicles
-app.use("/api/v1/vehicles",vehicleRoute)
+app.use("/api/v1/vehicles", vehicleRoute)
+
+// Users
+app.use("/api/v1/auth", authRoute)
 
 
 
-app.use((req:Request, res: Response) => {
+app.use((req: Request, res: Response) => {
     res.status(404).json({
         success: false,
         message: "Route not found",
