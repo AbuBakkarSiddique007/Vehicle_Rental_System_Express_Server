@@ -22,7 +22,30 @@ const getAllUsers = async (req: Request, res: Response) => {
 
 
 const updateUser = async (req: Request, res: Response) => {
+
     const { userId } = req.params
+    const requestedUser = (req as any).user;
+
+    if (!requestedUser) {
+        return res.status(401).json({
+            success: false,
+            message: "Unauthorized"
+        });
+    }
+
+
+    // Admin: update any
+    // customer: only own
+    if (requestedUser.role !== "admin" && String(requestedUser.id) !== String(userId)) {
+        return res.status(403).json({
+            success: false,
+            message: "Forbidden"
+        });
+    }
+
+
+    if (requestedUser.role !== "admin" && 'role' in req.body) delete req.body.role;
+
 
     const result = await userService.updateUser(userId as string, req.body)
 
@@ -43,9 +66,26 @@ const updateUser = async (req: Request, res: Response) => {
     });
 }
 
+
 const deleteUser = async (req: Request, res: Response) => {
 
     const { userId } = req.params
+    const requestedUser = (req as any).user;
+
+    if (!requestedUser) {
+        return res.status(401).json({
+            success: false,
+            message: "Unauthorized"
+        });
+    }
+
+    if (requestedUser.role !== "admin") {
+        return res.status(403).json({
+            success: false,
+            message: "Forbidden"
+        });
+    }
+
 
     const result = await userService.deleteUser(userId as string)
 
