@@ -49,14 +49,14 @@ const createBooking = async (payload: CreateBookingPayload) => {
     // 4. Insert booking:
     const bookingResult = await pool.query(
         `
-      INSERT INTO bookings (
-        customer_id, vehicle_id,
-        rent_start_date, rent_end_date,
-        total_price, status
-      )
-      VALUES ($1, $2, $3, $4, $5, 'active')
-      RETURNING *
-    `,
+            INSERT INTO bookings (
+                customer_id, vehicle_id,
+                rent_start_date, rent_end_date,
+                total_price, status
+            )
+            VALUES ($1, $2, $3, $4, $5, 'active')
+            RETURNING id, customer_id, vehicle_id, rent_start_date, rent_end_date, total_price, status
+        `,
         [customer_id, vehicle_id, rent_start_date, rent_end_date, total_price]
     );
 
