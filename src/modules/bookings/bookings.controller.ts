@@ -5,7 +5,31 @@ import { bookingService } from "./bookings.service";
 const createBooking = async (req: Request, res: Response) => {
 
     try {
-        const booking = await bookingService.createBooking(req.body);
+        const requested = (req as any).user;
+
+        if (!requested) {
+            return res.status(401).json({
+                success: false,
+                message: "Unauthorized"
+            });
+        }
+
+        const { vehicle_id, rent_start_date, rent_end_date } = req.body || {};
+
+        if (!vehicle_id || !rent_start_date || !rent_end_date) {
+            return res.status(400).json({
+                success: false,
+                message: "vehicle_id, rent_start_date and rent_end_date are required"
+            });
+        }
+
+        const payload = { ...req.body };
+
+        if (requested.role === "customer") {
+            payload.customer_id = requested.id;
+        }
+
+        const booking = await bookingService.createBooking(payload as any);
 
         res.status(201).json({
             success: true,
@@ -25,69 +49,136 @@ const createBooking = async (req: Request, res: Response) => {
 const getAllBookings = async (req: Request, res: Response) => {
 
     try {
-        const bookings = await bookingService.getAllBookings();
+        const requested = (req as any).user;
+
+        if (!requested) {
+            return res.status(401).json({
+                success: false,
+                message: "Unauthorized"
+            });
+        }
+
+        const allBookings = await bookingService.getAllBookings();
+
+        if (requested.role === "admin") {
+            return res.status(200).json({
+                success: true,
+                message: "Bookings retrieved successfully",
+                data: allBookings
+            });
+        }
+
+        // customer: only own bookings
+        const customer = allBookings.filter(b => String(b.customer_id) === String(requested.id));
 
         res.status(200).json({
             success: true,
-            message: "Bookings retrieved successfully",
-            data: bookings,
+            message: "Your bookings retrieved successfully",
+            data: customer
         });
 
     } catch (err: any) {
         res.status(500).json({
             success: false,
-            message: err.message,
+            message: err.message
         });
     }
 };
 
+
 const updateBooking = async (req: Request, res: Response) => {
-
-    const { bookingId } = req.params;
-    const { status } = req.body as { status?: string };
-
     try {
+        const { bookingId } = req.params;
+        const { status } = req.body as { status?: string };
+        const requested = (req as any).user;
+
         if (!status) {
             return res.status(400).json({
                 success: false,
-                message: "Status is required",
+                message: "Status is required"
             });
         }
 
-        if (status !== "cancelled" && status !== "returned") {
-            return res.status(400).json({
-                success: false,
-                message: "Status must be either 'cancelled' or 'returned'",
-            });
-        }
+        const bookingResult = await bookingService.getBookingById(bookingId!);
 
-        const updated = await bookingService.updateBookingStatus(
-            bookingId!,
-            status as "cancelled" | "returned"
-        );
-
-        const message =
-            status === "cancelled"
-                ? "Booking cancelled successfully"
-                : "Booking marked as returned. Vehicle is now available";
-
-        res.status(200).json({
-            success: true,
-            message,
-            data: updated,
-        });
-
-    } catch (error: any) {
-        if (error.message === "Booking not found") {
+        if (!bookingResult) {
             return res.status(404).json({
                 success: false,
-                message: error.message,
+                message: "Booking not found"
             });
         }
 
+        if (!requested) {
+            return res.status(401).json({
+                success: false,
+                message: "Unauthorized"
+            });
+        }
+
+        // Customer cancelling:
+        if (requested.role === "customer") {
+            if (status !== "cancelled") {
+                return res.status(403).json({
+                    success: false,
+                    message: "Customers can only cancel bookings"
+                });
+            }
+
+            if (String(bookingResult.customer_id) !== String(requested.id)) {
+                return res.status(403).json({
+                    success: false,
+                    message: "You can cancel only your bookings"
+                });
+            }
+
+            const now = new Date();
+            if (!bookingResult.rent_start_date) {
+                return res.status(500).json({
+                    success: false,
+                    message: "Booking has invalid start date"
+                });
+            }
+
+            const start = new Date(bookingResult.rent_start_date);
+            if (now >= start) {
+                return res.status(400).json({
+                    success: false,
+                    message: "Cannot cancel booking on/after start date"
+                });
+            }
+
+            const updated = await bookingService.updateBookingStatus(bookingId!, "cancelled");
+
+            return res.status(200).json({
+                success: true,
+                message: "Booking cancelled successfully",
+                data: updated
+            });
+        }
+
+        // Admin marking as returned:
+        if (requested.role === "admin") {
+            if (status !== "returned") {
+                return res.status(403).json({ success: false, message: "Admin may only mark returned here" });
+            }
+
+            const updated = await bookingService.updateBookingStatus(bookingId!, "returned");
+
+            return res.status(200).json({
+                success: true,
+                message: "Booking marked as returned",
+                data: updated
+            });
+        }
+
+        res.status(403).json({
+            success: false,
+            message: "Forbidden"
+        });
+    } catch (err: any) {
         res.status(400).json({
             success: false,
-            message: error.message,
+            message: err.message
         });
     }
 };

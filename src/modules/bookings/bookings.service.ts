@@ -93,6 +93,18 @@ const getAllBookings = async () => {
 };
 
 
+const getBookingById = async (bookingId: string) => {
+    const result = await pool.query(`SELECT * FROM bookings WHERE id = $1`, [bookingId]);
+
+    return result.rowCount ? result.rows[0] : null;
+};
+
+const getBookingsByCustomerId = async (customerId: string | number) => {
+    const result = await pool.query(`SELECT * FROM bookings WHERE customer_id = $1`, [customerId]);
+    return result.rows;
+};
+
+
 
 const updateBookingStatus = async (bookingId: string, status: "cancelled" | "returned") => {
     const existingResult = await pool.query(
@@ -119,13 +131,16 @@ const updateBookingStatus = async (bookingId: string, status: "cancelled" | "ret
 
     const updated = updatedResult.rows[0];
 
-    // When cancelled or returned ==> vehicle becomes available:
-    await pool.query(
-        `
-        UPDATE vehicles SET availability_status = 'available' WHERE id = $1
-        `,
-        [updated.vehicle_id]
+    const vehicleId = updated.vehicle_id;
+
+    const activeForVehicle = await pool.query(
+        `SELECT 1 FROM bookings WHERE vehicle_id = $1 AND status = 'active' LIMIT 1`,
+        [vehicleId]
     );
+
+    if (activeForVehicle.rowCount === 0) {
+        await pool.query(`UPDATE vehicles SET availability_status = 'available' WHERE id = $1`, [vehicleId]);
+    }
 
     return updated;
 };
@@ -133,5 +148,7 @@ const updateBookingStatus = async (bookingId: string, status: "cancelled" | "ret
 export const bookingService = {
     createBooking,
     getAllBookings,
+    getBookingById,
+    getBookingsByCustomerId,
     updateBookingStatus,
 };
