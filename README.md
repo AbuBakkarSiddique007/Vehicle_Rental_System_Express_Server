@@ -2,7 +2,8 @@
 
 A lightweight backend API for managing vehicle inventory, customer accounts, and rental bookings. It provides secure, role-based access for admins and customers and includes booking lifecycle handling (create, cancel, return).
 
-Live URL: [Server Link](https://assignment-02-lake.vercel.app) 
+**Live URL:**  
+[https://assignment-02-lake.vercel.app](https://assignment-02-lake.vercel.app)
 
 ## Features
 
