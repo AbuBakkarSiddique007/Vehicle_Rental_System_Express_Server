@@ -1,6 +1,7 @@
 import jwt, { JwtPayload } from 'jsonwebtoken';
 import { NextFunction, Request, Response } from "express"
 import config from '../config';
+import { pool } from '../config/db'
 
 const auth = (...roles: string[]) => {
 
@@ -27,10 +28,32 @@ const auth = (...roles: string[]) => {
             }
 
             const decoded = jwt.verify(token!, secret) as JwtPayload & { id?: number; role?: string };
-            req.user = decoded;
 
+            if (!decoded.id) {
+                return res.status(401).json({
+                    success: false,
+                    message: 'Unauthorized: Invalid token payload'
+                })
+            }
 
-            if (roles.length && !(decoded.role && roles.includes(decoded.role))) {
+            const queryResult = await pool.query('SELECT id, role FROM users WHERE id = $1', [decoded.id])
+
+            if (!queryResult || !queryResult.rows || queryResult.rows.length === 0) {
+                return res.status(401).json({
+                    success: false,
+                    message: 'Unauthorized: User not found'
+                })
+            }
+
+            const dbUser = queryResult.rows[0]
+
+            req.user = {
+                ...decoded,
+                id: dbUser.id,
+                role: dbUser.role
+            }
+
+            if (roles.length && !(dbUser.role && roles.includes(dbUser.role))) {
                 return res.status(403).json({
                     success: false,
                     message: "Forbidden: You don't have permission to access the path"
