@@ -58,23 +58,22 @@ const getAllBookings = async (req: Request, res: Response) => {
             });
         }
 
-        const allBookings = await bookingService.getAllBookings();
-
         if (requested.role === "admin") {
+            const adminBookings = await bookingService.getAllBookings();
             return res.status(200).json({
                 success: true,
                 message: "Bookings retrieved successfully",
-                data: allBookings
+                data: adminBookings
             });
         }
 
         // customer: only own bookings
-        const customer = allBookings.filter(b => String(b.customer_id) === String(requested.id));
+        const customerBookings = await bookingService.getBookingsByCustomerId(requested.id);
 
         res.status(200).json({
             success: true,
             message: "Your bookings retrieved successfully",
-            data: customer
+            data: customerBookings
         });
 
     } catch (err: any) {
